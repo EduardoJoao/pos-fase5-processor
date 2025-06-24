@@ -1,0 +1,28 @@
+.PHONY: init-k8s plan-k8s apply-k8s destroy-k8s init-db plan-db apply-db destroy-db
+
+
+# Kubernetes infrastructure
+init-k8s:
+    cd infra-kubernets && terraform init
+
+plan-k8s:
+    cd infra-kubernets && terraform plan
+
+apply-k8s:
+    cd infra-kubernets && terraform apply -auto-approve
+
+destroy-k8s:
+    cd infra-kubernets && terraform destroy -auto-approve
+
+# Database infrastructure
+init-db:
+    cd infra-db && terraform init
+
+plan-db:
+    cd infra-db && terraform plan -var-file=terraform.tfvars
+
+apply-db:
+    cd infra-db && terraform apply -var-file=terraform.tfvars -auto-approve
+
+destroy-db:
+    cd infra-db && terraform destroy -var-file=terraform.tfvars -auto-approve

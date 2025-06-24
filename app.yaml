@@ -1,0 +1,10 @@
+runtime: java17
+env: standard
+# remember to use an instance class compatible with your scaling type
+instance_class: B1
+handlers:
+  - url: .*
+    script: auto
+manual_scaling:
+  instances: 1
+service_account: projeto-back-lgpd@appspot.gserviceaccount.com
