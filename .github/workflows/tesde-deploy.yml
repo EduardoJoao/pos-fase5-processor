@@ -1,0 +1,109 @@
+name: Deploy to AWS EKS
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  sonarqube:
+    name: SonarQube Analysis
+    runs-on: ubuntu-latest
+    # Execute a análise Sonar apenas quando for um pull request
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          # Fetch all history for proper analysis
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: 17
+          distribution: 'temurin'
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Build and analyze
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+          -Dsonar.projectKey=EduardoJoao_pos-fase5-processor-service \
+          -Dsonar.projectName='pos-fase5-processor-service' \
+          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+          -Dsonar.qualitygate.wait=true \
+          -Dsonar.qualitygate.timeout=300
+
+  deploy:
+    runs-on: ubuntu-latest
+    # Execute o deploy apenas quando for um push para main
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+        
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+        
+    - name: Build & Push Docker Image
+      id: build-image
+      env:
+        ECR_REPOSITORY: processor
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -t ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        echo "image=${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+
+    - name: Terraform Init (IAM video-api)
+      working-directory: ./k8s
+      run: terraform init
+
+    - name: Terraform Apply IAM for video-api
+      working-directory: ./k8s
+      run: terraform apply -auto-approve -target=aws_iam_role.video_api_irsa -target=aws_iam_policy.video_api_policy -target=aws_iam_role_policy_attachment.video_api_attach
+        
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v1
+      
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --name events-cluster --region us-east-1
+        
+    - name: Deploy to EKS
+      run: |
+        # Atualizar a imagem no deployment
+        sed -i "s|783545975704.dkr.ecr.us-east-1.amazonaws.com/processor:latest|${{ steps.build-image.outputs.image }}|g" k8s/deployment.yaml
+        
+        # Aplicar o deployment e service
+        kubectl apply -f k8s/deployment.yaml
+        
+        # Verificar o status do rollout
+        kubectl rollout status deployment/processor

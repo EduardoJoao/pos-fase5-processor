@@ -1,0 +1,122 @@
+openapi: 3.0.1
+info:
+  title: FIAP X - Core Service API
+  description: API responsável pela persistência e gestão de vídeos para processamento
+  version: "1.0"
+
+servers:
+  - url: http://localhost:8081
+
+paths:
+  /videos:
+    post:
+      summary: Criar um novo registro de vídeo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                videoId:
+                  type: string
+                  example: "d7e7f8a1-91c4-4b99-8e3f-123456789abc"
+                userId:
+                  type: string
+                  example: "user-123"
+                videoKey:
+                  type: string
+                  example: "uploads/video-uuid/video.mp4"
+      responses:
+        '200':
+          description: Vídeo criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Video'
+    get:
+      summary: Listar todos os vídeos
+      responses:
+        '200':
+          description: Lista de vídeos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Video'
+
+  /videos/{id}:
+    get:
+      summary: Buscar detalhes de um vídeo pelo ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Vídeo encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Video'
+        '404':
+          description: Vídeo não encontrado
+
+  /videos/{id}/status:
+    put:
+      summary: Atualizar o status de um vídeo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: "PROCESSING"
+                errorMessage:
+                  type: string
+      responses:
+        '200':
+          description: Status atualizado com sucesso
+        '404':
+          description: Vídeo não encontrado
+
+components:
+  schemas:
+    Video:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "d7e7f8a1-91c4-4b99-8e3f-123456789abc"
+        userId:
+          type: string
+          example: "user-123"
+        videoKey:
+          type: string
+          example: "uploads/video-uuid/video.mp4"
+        status:
+          type: string
+          example: "CREATED"
+        errorMessage:
+          type: string
+          example: "Erro ao processar vídeo"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2025-06-19T10:15:30"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2025-06-19T10:20:00"
