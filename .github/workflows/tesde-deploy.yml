@@ -88,7 +88,7 @@ jobs:
 
     - name: Terraform Apply IAM for video-api
       working-directory: ./k8s
-      run: terraform apply -auto-approve -target=aws_iam_role.video_api_irsa -target=aws_iam_policy.video_api_policy -target=aws_iam_role_policy_attachment.video_api_attach
+      run: terraform apply -auto-approve -target=aws_iam_role.processor_irsa -target=aws_iam_policy.processor_policy -target=aws_iam_role_policy_attachment.processor_attach
         
     - name: Set up kubectl
       uses: azure/setup-kubectl@v1

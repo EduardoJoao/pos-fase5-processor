@@ -1,5 +1,6 @@
 # Serviço de Pedidos - Sistema de Gestão para Fast Food
 
+
 Este serviço gerencia pedidos e produtos para um sistema de lanchonete de fast food, oferecendo endpoints para criação, listagem e gerenciamento de produtos e pedidos.
 
 ## Responsabilidades
