@@ -107,6 +107,11 @@
 			<artifactId>javacv-platform</artifactId>
 			<version>1.5.7</version>
 		</dependency>
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>sts</artifactId>
+			<version>${aws.sdk.version}</version>
+		</dependency>
 	</dependencies>
 	<build>
 		<plugins>
