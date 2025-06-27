@@ -8,11 +8,9 @@ data "tls_certificate" "eks" {
   url = data.aws_eks_cluster.eks.identity[0].oidc[0].issuer
 }
 
-# Cria o OIDC provider se ele não existir
-resource "aws_iam_openid_connect_provider" "eks" {
-  client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = [data.tls_certificate.eks.certificates[0].sha1_fingerprint]
-  url             = data.aws_eks_cluster.eks.identity[0].oidc[0].issuer
+# BUSCA o OIDC provider existente ao invés de criar
+data "aws_iam_openid_connect_provider" "eks" {
+  url = data.aws_eks_cluster.eks.identity[0].oidc[0].issuer
 }
 
 # Busca os buckets S3 existentes por nome
@@ -39,7 +37,7 @@ resource "aws_iam_role" "processor_irsa" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = aws_iam_openid_connect_provider.eks.arn
+          Federated = data.aws_iam_openid_connect_provider.eks.arn  # Use data ao invés de resource
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
