@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -33,42 +34,31 @@ public class VideoProcessingWorkflowUseCase {
             // Download do vídeo do S3
             Path videoPath = s3StorageService.download(videoKey);
             try {
-                // Extração de frames
-                Path framesDir = frameExtractorService.extractFrames(videoPath);
-                try {
-                    // Criação do ZIP
-                    String baseFilename = request.getFilename().replaceFirst("[.][^.]+$", "");
-                    Path zipPath = zipService.zipDirectory(framesDir, baseFilename);
-                    try {
-                        // Upload do ZIP para o S3
-                        String zipKey = clientId + "/" + baseFilename + ".zip";
-                        s3StorageService.upload(zipKey, zipPath);
-                        long zipFileSize = Files.size(zipPath);
-                        // Atualizar status para SUCCESS
-                        updateVideoStatusApiClient.execute(clientId, videoId, "SUCCESS", null, baseFilename + ".zip", getVideoSizeInMB(zipFileSize));
-                    } finally {
-                        Files.deleteIfExists(zipPath);
-                    }
-                } finally {
-                    deleteDirectory(framesDir);
-                }
+                // Extração de frames EM MEMÓRIA
+                List<FrameExtractorService.FrameData> frames = frameExtractorService.extractFramesToMemory(videoPath);
+                
+                // Criação do ZIP EM MEMÓRIA
+                String baseFilename = request.getFilename().replaceFirst("[.][^.]+$", "");
+                byte[] zipData = zipService.zipFramesInMemory(frames, baseFilename);
+                
+                // Upload direto da memória para S3
+                String zipKey = clientId + "/" + baseFilename + ".zip";
+                s3StorageService.upload(zipKey, zipData);
+                
+                // Atualizar status para SUCCESS
+                String zipSize = String.format("%.2f MB", zipData.length / (1024.0 * 1024.0));
+                updateVideoStatusApiClient.execute(clientId, videoId, "SUCCESS", null, baseFilename + ".zip", zipSize);
+                
             } finally {
                 Files.deleteIfExists(videoPath);
             }
+            
         } catch (Exception e) {
             String errorMsg = "Erro ao processar vídeo: " + e.getMessage();
             log.error(errorMsg, e);
             
-            // Atualizar status para ERROR na API Core
             updateVideoStatusApiClient.execute(clientId, videoId, "ERROR", errorMsg, null, null);
-
-            // Enviar email de notificação sobre o erro
-            emailNotificationService.sendProcessingErrorEmail(
-                clientId, 
-                videoId, 
-                request.getFilename(), 
-                errorMsg
-            );
+            emailNotificationService.sendProcessingErrorEmail(clientId, videoId, request.getFilename(), errorMsg);
         }
     }
 

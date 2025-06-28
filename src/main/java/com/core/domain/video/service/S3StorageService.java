@@ -55,22 +55,46 @@ public class S3StorageService {
         }
     }
 
-    public void upload(String key, Path file) {
+    // Método original para upload de arquivos
+    // public void upload(String key, Path file) {
+    //     try {
+    //         log.info("Fazendo upload do arquivo {} para o bucket {} com a chave {}", 
+    //                 file, s3BucketProcessed, key);
+                    
+    //         s3Client.putObject(
+    //                 PutObjectRequest.builder()
+    //                         .bucket(s3BucketProcessed)
+    //                         .key(key)
+    //                         .build(),
+    //                 RequestBody.fromFile(file));
+                    
+    //         log.info("Upload concluído com sucesso");
+    //     } catch (Exception e) {
+    //         log.error("Erro ao fazer upload para o S3: {}", e.getMessage(), e);
+    //         throw e;
+    //     }
+    // }
+
+    // NOVO MÉTODO: Upload de array de bytes
+    public void upload(String key, byte[] data) throws IOException {
         try {
-            log.info("Fazendo upload do arquivo {} para o bucket {} com a chave {}", 
-                    file, s3BucketProcessed, key);
-                    
-            s3Client.putObject(
-                    PutObjectRequest.builder()
-                            .bucket(s3BucketProcessed)
-                            .key(key)
-                            .build(),
-                    RequestBody.fromFile(file));
-                    
-            log.info("Upload concluído com sucesso");
+            log.info("Fazendo upload de {} bytes para o bucket {} com a chave {}", 
+                    data.length, s3BucketProcessed, key);
+            
+            PutObjectRequest putRequest = PutObjectRequest.builder()
+                    .bucket(s3BucketProcessed)
+                    .key(key)
+                    .contentLength((long) data.length)
+                    .contentType("application/zip")
+                    .build();
+
+            RequestBody requestBody = RequestBody.fromBytes(data);
+            s3Client.putObject(putRequest, requestBody);
+            
+            log.info("Upload de {} bytes concluído com sucesso", data.length);
         } catch (Exception e) {
-            log.error("Erro ao fazer upload para o S3: {}", e.getMessage(), e);
-            throw e;
+            log.error("Erro ao fazer upload de bytes para S3: {}", e.getMessage(), e);
+            throw new IOException("Falha no upload para S3", e);
         }
     }
 }

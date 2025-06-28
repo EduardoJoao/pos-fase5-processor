@@ -1,29 +1,40 @@
 package com.core.domain.video.service;
 
+import com.core.domain.video.service.FrameExtractorService.FrameData;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.*;
+import java.util.List;
 import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 @Service
 public class ZipService {
-    public Path zipDirectory(Path dir, String name) throws IOException {
-        Path zipPath = Files.createTempFile(name, ".zip");
-        try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(zipPath))) {
-            // Definir nível máximo de compressão
+    
+    public byte[] zipFramesInMemory(List<FrameData> frames, String name) throws IOException {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             ZipOutputStream zos = new ZipOutputStream(baos)) {
+            
+            // Configurar compressão máxima
             zos.setLevel(Deflater.BEST_COMPRESSION);
             
-            Files.list(dir).forEach(path -> {
-                try {
-                    zos.putNextEntry(new ZipEntry(path.getFileName().toString()));
-                    Files.copy(path, zos);
-                    zos.closeEntry();
-                } catch (IOException e) { throw new RuntimeException(e); }
-            });
+            for (FrameData frame : frames) {
+                ZipEntry entry = new ZipEntry(frame.getFilename());
+                zos.putNextEntry(entry);
+                
+                try (ByteArrayInputStream bais = new ByteArrayInputStream(frame.getData())) {
+                    bais.transferTo(zos);
+                }
+                
+                zos.closeEntry();
+            }
+            
+            zos.finish();
+            return baos.toByteArray();
         }
-        return zipPath;
     }
 }
