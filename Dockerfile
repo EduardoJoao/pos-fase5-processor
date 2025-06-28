@@ -15,18 +15,26 @@ RUN mvn dependency:go-offline -B
 COPY src/ src/
 RUN mvn package -DskipTests
 
-# Etapa 2: Imagem final com FFmpeg
-FROM eclipse-temurin:17-jre-alpine
+# Etapa 2: Imagem final com Ubuntu (melhor compatibilidade com FFmpeg)
+FROM eclipse-temurin:17-jre
 
-# Instalar FFmpeg e dependências necessárias
-RUN apk --no-cache add \
+# Instalar FFmpeg e dependências necessárias no Ubuntu
+RUN apt-get update && apt-get install -y \
     ffmpeg \
+    libavcodec-dev \
+    libavformat-dev \
+    libavutil-dev \
+    libswscale-dev \
+    libswresample-dev \
     ca-certificates \
-    && rm -rf /var/cache/apk/* \
-    && addgroup -S spring && adduser -S spring -G spring
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r spring && useradd -r -g spring spring
 
 # Verificar se FFmpeg foi instalado corretamente
 RUN ffmpeg -version
+
+# Definir variáveis de ambiente para bibliotecas
+ENV LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
 
 USER spring:spring
 WORKDIR /app
@@ -34,8 +42,8 @@ WORKDIR /app
 # Copia apenas o JAR gerado
 COPY --from=build --chown=spring:spring /app/target/pos-fase5-processor-0.0.1-SNAPSHOT.jar app.jar
 
-# Configurações JVM para contêineres (aumentadas para processamento de vídeo)
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UnlockExperimentalVMOptions -XX:+UseZGC"
+# Configurações JVM ajustadas para evitar problemas com bibliotecas nativas
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.awt.headless=true -Djna.library.path=/usr/lib/x86_64-linux-gnu"
 
 # Expõe a porta da aplicação
 EXPOSE 8080
