@@ -5,16 +5,17 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-
 jobs:
   sonarqube:
     name: SonarQube Analysis
     runs-on: ubuntu-latest
+    # Execute a análise Sonar apenas quando for um pull request
     if: github.event_name == 'pull_request'
 
     steps:
       - uses: actions/checkout@v3
         with:
+          # Fetch all history for proper analysis
           fetch-depth: 0
 
       - name: Set up JDK 17
@@ -51,6 +52,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
+    # Execute o deploy apenas quando for um push para main
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
@@ -66,13 +68,6 @@ jobs:
     - name: Login to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
-
-    - name: Test Docker Build with FFmpeg
-      run: |
-        docker build -t test-ffmpeg .
-        echo "Verificando se FFmpeg está disponível na imagem:"
-        docker run --rm test-ffmpeg ffmpeg -version || echo "⚠️ FFmpeg não encontrado!"
-        docker run --rm test-ffmpeg java -version
         
     - name: Build & Push Docker Image
       id: build-image
@@ -87,11 +82,11 @@ jobs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
 
-    - name: Terraform Init (IAM processor)
+    - name: Terraform Init (IAM video-api)
       working-directory: ./k8s
       run: terraform init
 
-    - name: Terraform Apply IAM for processor
+    - name: Terraform Apply IAM for video-api
       working-directory: ./k8s
       run: terraform apply -auto-approve -target=aws_iam_role.processor_irsa -target=aws_iam_policy.processor_policy -target=aws_iam_role_policy_attachment.processor_attach
         
@@ -107,49 +102,8 @@ jobs:
         # Atualizar a imagem no deployment
         sed -i "s|783545975704.dkr.ecr.us-east-1.amazonaws.com/processor:latest|${{ steps.build-image.outputs.image }}|g" k8s/deployment.yaml
         
-        echo "🚀 Aplicando deployment..."
+        # Aplicar o deployment e service
         kubectl apply -f k8s/deployment.yaml
         
-        echo "⏳ Aguardando rollout..."
-        kubectl rollout status deployment/processor --timeout=300s
-        
-        echo "📊 Status dos pods após deploy:"
-        kubectl get pods -l app=processor
-        
-        echo "🔍 Últimos logs do pod:"
-        kubectl logs -l app=processor --tail=20 || echo "Nenhum log ainda disponível"
-
-    - name: Post-Deploy Validation
-      run: |
-        echo "🔍 Verificando saúde da aplicação..."
-        
-        # Aguardar pod estar pronto
-        kubectl wait --for=condition=ready pod -l app=processor --timeout=120s || echo "⚠️ Pod não ficou pronto"
-        
-        # Verificar eventos relacionados ao pod
-        echo "📝 Eventos recentes do pod:"
-        kubectl get events --field-selector involvedObject.kind=Pod --sort-by='.lastTimestamp' | grep processor | tail -5
-        
-        # Verificar logs em caso de erro
-        POD_STATUS=$(kubectl get pods -l app=processor -o jsonpath='{.items[0].status.phase}')
-        if [ "$POD_STATUS" != "Running" ]; then
-          echo "❌ Pod não está rodando. Status: $POD_STATUS"
-          echo "🔍 Logs completos do pod:"
-          kubectl logs -l app=processor --tail=50
-          echo "🔍 Describe do pod:"
-          kubectl describe pod -l app=processor
-          exit 1
-        else
-          echo "✅ Pod está rodando com sucesso!"
-        fi
-
-    - name: Deploy Status Summary
-      if: always()
-      run: |
-        echo "📋 RESUMO DO DEPLOY:"
-        echo "- Imagem: ${{ steps.build-image.outputs.image }}"
-        echo "- Commit: ${{ github.sha }}"
-        echo "- Status do deployment:"
-        kubectl get deployment processor -o wide || echo "Deployment não encontrado"
-        echo "- Pods ativos:"
-        kubectl get pods -l app=processor || echo "Nenhum pod encontrado"
+        # Verificar o status do rollout
+        kubectl rollout status deployment/processor
