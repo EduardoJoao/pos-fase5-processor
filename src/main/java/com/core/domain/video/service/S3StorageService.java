@@ -32,7 +32,7 @@ public class S3StorageService {
 
     public Path download(String key) throws IOException {
         try {
-            Path tempFile = createSecureTempFile("video", ".mp4");
+            Path tempFile = Files.createTempFile("video", ".mp4");
             
             // Log para verificar o caminho do arquivo
             log.info("Tentando baixar o arquivo {} do bucket {} para {}", key, s3Bucket, tempFile);
@@ -77,33 +77,6 @@ public class S3StorageService {
         } catch (Exception e) {
             log.error("Erro ao fazer upload de bytes para S3: {}", e.getMessage(), e);
             throw new IOException("Falha no upload para S3", e);
-        }
-    }
-
-    /**
-     * Cria um arquivo temporário de forma segura com permissões restritas.
-     * Solução para alertas do SonarQube sobre diretórios publicamente acessíveis.
-     */
-    private Path createSecureTempFile(String prefix, String suffix) throws IOException {
-        try {
-            // Tentar criar com permissões POSIX (Linux/Unix)
-            Set<PosixFilePermission> permissions = PosixFilePermissions.fromString("rw-------");
-            FileAttribute<Set<PosixFilePermission>> fileAttribute = PosixFilePermissions.asFileAttribute(permissions);
-            return Files.createTempFile(prefix, suffix, fileAttribute);
-        } catch (UnsupportedOperationException e) {
-            // Fallback para sistemas Windows ou que não suportam POSIX
-            log.debug("Sistema não suporta permissões POSIX, usando método padrão");
-            Path tempFile = Files.createTempFile(prefix, suffix);
-            
-            // Configurar permissões usando java.io.File para compatibilidade com Windows
-            java.io.File file = tempFile.toFile();
-            file.setReadable(false, false);  // Remove leitura para outros
-            file.setWritable(false, false);  // Remove escrita para outros
-            file.setExecutable(false, false); // Remove execução para outros
-            file.setReadable(true, true);    // Permite leitura apenas para o proprietário
-            file.setWritable(true, true);    // Permite escrita apenas para o proprietário
-            
-            return tempFile;
         }
     }
 }
