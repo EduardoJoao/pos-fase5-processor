@@ -13,6 +13,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -28,8 +32,7 @@ public class S3StorageService {
 
     public Path download(String key) throws IOException {
         try {
-            // Criar o arquivo temporário primeiro
-            Path tempFile = Files.createTempFile("video", ".mp4");
+            Path tempFile = createSecureTempFile("video", ".mp4");
             
             // Log para verificar o caminho do arquivo
             log.info("Tentando baixar o arquivo {} do bucket {} para {}", key, s3Bucket, tempFile);
@@ -55,27 +58,6 @@ public class S3StorageService {
         }
     }
 
-    // Método original para upload de arquivos
-    // public void upload(String key, Path file) {
-    //     try {
-    //         log.info("Fazendo upload do arquivo {} para o bucket {} com a chave {}", 
-    //                 file, s3BucketProcessed, key);
-                    
-    //         s3Client.putObject(
-    //                 PutObjectRequest.builder()
-    //                         .bucket(s3BucketProcessed)
-    //                         .key(key)
-    //                         .build(),
-    //                 RequestBody.fromFile(file));
-                    
-    //         log.info("Upload concluído com sucesso");
-    //     } catch (Exception e) {
-    //         log.error("Erro ao fazer upload para o S3: {}", e.getMessage(), e);
-    //         throw e;
-    //     }
-    // }
-
-    // NOVO MÉTODO: Upload de array de bytes
     public void upload(String key, byte[] data) throws IOException {
         try {
             log.info("Fazendo upload de {} bytes para o bucket {} com a chave {}", 
@@ -95,6 +77,33 @@ public class S3StorageService {
         } catch (Exception e) {
             log.error("Erro ao fazer upload de bytes para S3: {}", e.getMessage(), e);
             throw new IOException("Falha no upload para S3", e);
+        }
+    }
+
+    /**
+     * Cria um arquivo temporário de forma segura com permissões restritas.
+     * Solução para alertas do SonarQube sobre diretórios publicamente acessíveis.
+     */
+    private Path createSecureTempFile(String prefix, String suffix) throws IOException {
+        try {
+            // Tentar criar com permissões POSIX (Linux/Unix)
+            Set<PosixFilePermission> permissions = PosixFilePermissions.fromString("rw-------");
+            FileAttribute<Set<PosixFilePermission>> fileAttribute = PosixFilePermissions.asFileAttribute(permissions);
+            return Files.createTempFile(prefix, suffix, fileAttribute);
+        } catch (UnsupportedOperationException e) {
+            // Fallback para sistemas Windows ou que não suportam POSIX
+            log.debug("Sistema não suporta permissões POSIX, usando método padrão");
+            Path tempFile = Files.createTempFile(prefix, suffix);
+            
+            // Configurar permissões usando java.io.File para compatibilidade com Windows
+            java.io.File file = tempFile.toFile();
+            file.setReadable(false, false);  // Remove leitura para outros
+            file.setWritable(false, false);  // Remove escrita para outros
+            file.setExecutable(false, false); // Remove execução para outros
+            file.setReadable(true, true);    // Permite leitura apenas para o proprietário
+            file.setWritable(true, true);    // Permite escrita apenas para o proprietário
+            
+            return tempFile;
         }
     }
 }
