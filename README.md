@@ -184,3 +184,5 @@ Para verificar a cobertura:
 mvn verify
 # Relatório disponível em: target/site/jacoco/index.html
 ```
+## Evidência de cobertura de teste
+![alt text](image.png)
