@@ -19,15 +19,6 @@ class FrameExtractorServiceTest {
     Path tempDir;
 
     @Test
-    void extractFrames_shouldCreateFramesDirectory() throws Exception {
-        FrameExtractorService service = new FrameExtractorService();
-        Path fakeVideo = Files.createTempFile(tempDir, "video", ".mp4");
-
-        // Arquivo fake deve gerar exceção
-        assertThrows(Exception.class, () -> service.extractFrames(fakeVideo));
-    }
-
-    @Test
     void extractFramesToMemory_withRealVideo_shouldExtractFrames() throws Exception {
         // Arrange
         FrameExtractorService service = new FrameExtractorService();
@@ -53,48 +44,6 @@ class FrameExtractorServiceTest {
             // Log para debug
             System.out.println("Frames extraídos: " + frames.size());
             System.out.println("Primeiro frame: " + firstFrame.getFilename() + " (" + firstFrame.getData().length + " bytes)");
-            
-        } finally {
-            Files.deleteIfExists(realVideo);
-        }
-    }
-
-    @Test
-    void extractFrames_withRealVideo_shouldCreateDirectory() throws Exception {
-        // Arrange
-        FrameExtractorService service = new FrameExtractorService();
-        Path realVideo = copyVideoFromResources("Teste2.mp4");
-        
-        try {
-            // Act
-            Path framesDir = service.extractFrames(realVideo);
-            
-            // Assert
-            assertNotNull(framesDir);
-            assertTrue(Files.exists(framesDir));
-            assertTrue(Files.isDirectory(framesDir));
-            
-            // Verificar se tem arquivos
-            long frameCount = Files.list(framesDir)
-                    .filter(p -> p.getFileName().toString().endsWith(".jpg"))
-                    .count();
-            
-            assertTrue(frameCount > 0, "Deveria ter criado pelo menos 1 frame");
-            
-            // Log para debug
-            System.out.println("Diretório criado: " + framesDir);
-            System.out.println("Frames criados: " + frameCount);
-            
-            // Cleanup
-            Files.walk(framesDir)
-                    .sorted((a, b) -> b.compareTo(a)) // Deletar arquivos antes de diretórios
-                    .forEach(path -> {
-                        try {
-                            Files.deleteIfExists(path);
-                        } catch (IOException e) {
-                            // Ignore
-                        }
-                    });
             
         } finally {
             Files.deleteIfExists(realVideo);

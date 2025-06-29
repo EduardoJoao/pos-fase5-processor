@@ -13,6 +13,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -28,7 +32,6 @@ public class S3StorageService {
 
     public Path download(String key) throws IOException {
         try {
-            // Criar o arquivo temporário primeiro
             Path tempFile = Files.createTempFile("video", ".mp4");
             
             // Log para verificar o caminho do arquivo
@@ -55,27 +58,6 @@ public class S3StorageService {
         }
     }
 
-    // Método original para upload de arquivos
-    // public void upload(String key, Path file) {
-    //     try {
-    //         log.info("Fazendo upload do arquivo {} para o bucket {} com a chave {}", 
-    //                 file, s3BucketProcessed, key);
-                    
-    //         s3Client.putObject(
-    //                 PutObjectRequest.builder()
-    //                         .bucket(s3BucketProcessed)
-    //                         .key(key)
-    //                         .build(),
-    //                 RequestBody.fromFile(file));
-                    
-    //         log.info("Upload concluído com sucesso");
-    //     } catch (Exception e) {
-    //         log.error("Erro ao fazer upload para o S3: {}", e.getMessage(), e);
-    //         throw e;
-    //     }
-    // }
-
-    // NOVO MÉTODO: Upload de array de bytes
     public void upload(String key, byte[] data) throws IOException {
         try {
             log.info("Fazendo upload de {} bytes para o bucket {} com a chave {}", 
